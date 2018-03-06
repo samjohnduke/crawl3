@@ -100,9 +100,10 @@ type crawler struct {
 
 // ServiceOpts are optional interfaces that are used through the system
 type ServiceOpts struct {
-	Logger     *log.Logger
-	Instrument Instrument
-	Extractors extractors
+	Logger      *log.Logger
+	Instrument  Instrument
+	Extractors  extractors
+	WorkerCount int64
 }
 
 // New creates the core service that will be used to crawl with
@@ -150,7 +151,7 @@ func New(opts ServiceOpts, workerFactoryInv WorkerFactoryInvoker) (Service, erro
 		factory = workerFactoryInv(workerOpts)
 	}
 
-	dispatcher := newDispatcher(4, queue, factory)
+	dispatcher := newDispatcher(opts.WorkerCount, queue, factory)
 	err := dispatcher.Start()
 	if err != nil {
 		return nil, err
