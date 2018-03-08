@@ -68,12 +68,13 @@ func (u *URL) ResolveReference(root *url.URL) error {
 
 type urlList struct {
 	list []*URL
-	mu   sync.Mutex
+	mu   *sync.Mutex
 }
 
 func newURLList() *urlList {
 	return &urlList{
 		list: []*URL{},
+		mu:   &sync.Mutex{},
 	}
 }
 
@@ -92,8 +93,8 @@ func (ul *urlList) pop(c int) []*URL {
 	ul.mu.Lock()
 	defer ul.mu.Unlock()
 
-	p := ul.list[len(ul.list)-c-1:]
-	ul.list = ul.list[:len(ul.list)-c-1]
+	p := ul.list[len(ul.list)-c:]
+	ul.list = ul.list[:len(ul.list)-c]
 	return p
 }
 

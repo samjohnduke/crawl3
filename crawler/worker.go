@@ -3,6 +3,7 @@ package crawler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -111,6 +112,11 @@ func (w *defaultWorker) do(u *Crawl) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode >= 400 {
+		w.logger.Println(resp.Status)
+		return errors.New("Error fetching page")
+	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		w.logger.Println(err)
@@ -135,6 +141,15 @@ func (w *defaultWorker) do(u *Crawl) error {
 		}
 		return ""
 	})
+
+	urls2 := doc.Find("area[href]").Map(func(i int, sel *goquery.Selection) string {
+		if attr, ok := sel.Attr("href"); ok {
+			return attr
+		}
+		return ""
+	})
+
+	urls = append(urls, urls2...)
 
 	metadata := make(map[string]string)
 	doc.Find("meta[name]").Each(func(_ int, sel *goquery.Selection) {

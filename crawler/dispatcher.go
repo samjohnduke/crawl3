@@ -14,7 +14,7 @@ type dispatcher struct {
 func newDispatcher(count int64, queue chan *Crawl, createWorkerFunc WorkerFactoryFunc) *dispatcher {
 	dispatcher := &dispatcher{
 		workerCount: count,
-		workerQueue: make(chan chan *Crawl, count),
+		workerQueue: make(chan chan *Crawl, count+1),
 		workQueue:   queue,
 		workers:     []Worker{},
 		quit:        make(chan chan bool),

@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/nats-io/go-nats"
 	"github.com/samjohnduke/crawl3/crawler"
 )
@@ -27,14 +26,12 @@ func main() {
 	}
 
 	instrument := crawler.NewInstrumentationMem()
-	go func() {
-		spew.Dump(instrument)
-	}()
 
 	//create the service
 	service, err := crawler.New(crawler.ServiceOpts{
-		Instrument: instrument,
-		Logger:     log.New(os.Stdout, "", log.LstdFlags),
+		Instrument:  instrument,
+		Logger:      log.New(os.Stdout, "", log.LstdFlags),
+		WorkerCount: 4,
 	}, func(opts crawler.WorkerOpts) crawler.WorkerFactoryFunc {
 		return func(pool chan chan *crawler.Crawl) crawler.Worker {
 			return crawler.NewDefaultWorker(pool, opts)

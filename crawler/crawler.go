@@ -194,6 +194,7 @@ func (c *crawler) CrawlAsync(ctx context.Context, url string, cb func(*Crawl)) (
 
 //A synchronous request for crawling a webpage
 func (c *crawler) Crawl(ctx context.Context, url string) (result *Crawl, err error) {
+	log.Println(url)
 	crawl := &Crawl{
 		URL: url,
 		sig: make(chan struct{}),

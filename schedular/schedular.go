@@ -6,7 +6,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/samjohnduke/crawl3/crawler"
 )
 
@@ -16,6 +15,8 @@ var ErrCancelSchedule = errors.New("Cancel Schedule for harvest")
 // Service is the interface for launching the spider against a particular service border
 // and the implmentation should use this appropriately
 type Service interface {
+	Start()
+	Stop(context.Context) error
 	Schedule(rootURL string) error
 	ScheduleAfter(t time.Time, rootURL string) error
 	OnHarvest(func(*crawler.Crawl) error)
@@ -35,6 +36,7 @@ type Schedular struct {
 	instrument crawler.Instrument
 	logger     *log.Logger
 	client     crawler.Client
+	allowed    map[string]bool
 }
 
 // Opts are used to customise the
@@ -44,10 +46,16 @@ type Opts struct {
 	Client               crawler.Client
 	ConcurrencyPerDomain int
 	CrawlDelay           time.Duration
+	AllowedDomains       []string
 }
 
 // NewSchedular created the new schedular from a set of options
 func NewSchedular(opts Opts) (Service, error) {
+	allowed := make(map[string]bool)
+	for _, a := range opts.AllowedDomains {
+		allowed[a] = true
+	}
+
 	return &Schedular{
 		visited:    make(map[string]*URL),
 		pending:    make(map[string]*urlList),
@@ -58,6 +66,7 @@ func NewSchedular(opts Opts) (Service, error) {
 		client:     opts.Client,
 		delay:      opts.CrawlDelay,
 		die:        make(chan chan bool),
+		allowed:    allowed,
 	}, nil
 }
 
@@ -69,7 +78,6 @@ func (s *Schedular) Start() {
 		for {
 			select {
 			case <-timer.C:
-				log.Println("Scheduling URLs")
 				s.run()
 				break
 
@@ -97,15 +105,25 @@ func (s *Schedular) Stop(ctx context.Context) error {
 }
 
 func (s *Schedular) run() {
+
 	toCrawl := []*URL{}
 	for _, list := range s.pending {
-		if list.Len() > s.frequency {
+		if list.Len() >= s.frequency {
 			toCrawl = append(toCrawl, list.pop(s.frequency)...)
+		} else if list.Len() > 0 {
+			toCrawl = append(toCrawl, list.pop(1)...)
 		}
 	}
 
 	for _, u := range toCrawl {
-		go s.crawl(u)
+		if _, exists := s.visited[u.normalised]; exists {
+			continue
+		}
+
+		rHost := u.url.Hostname()
+		if _, exists := s.allowed[rHost]; exists {
+			go s.crawl(u)
+		}
 	}
 }
 
@@ -113,11 +131,18 @@ func (s *Schedular) crawl(u *URL) {
 	s.instrument.Gauge("scheduled_crawl_progress", 1)
 	defer s.instrument.Gauge("scheduled_crawl_progress", -1)
 
+	log.Println("starting crawl of: ", u.normalised)
 	crawl, err := s.client.Crawl(context.Background(), u.normalised)
 	if err != nil {
 		s.instrument.Count("scheduled_crawl_error")
 		log.Println(err)
 	}
+
+	if crawl.Error != nil {
+		log.Println(crawl.Error)
+	}
+
+	s.visited[u.normalised] = u
 
 	if s.cb != nil {
 		err := s.cb(crawl)
@@ -129,12 +154,11 @@ func (s *Schedular) crawl(u *URL) {
 	for _, hu := range crawl.HarvestedURLs {
 		url, err := NewURLWithReference(hu, crawl.URL)
 		if err != nil {
+			log.Println(err)
 			continue
 		}
 		s.Schedule(url.normalised)
 	}
-
-	spew.Dump(crawl.HarvestedURLs)
 }
 
 // ScheduleAfter schedules a url to run after a given point in time
@@ -159,8 +183,9 @@ func (s *Schedular) Schedule(root string) error {
 		li := newURLList()
 		li.unshift(rURL)
 		s.pending[rHost] = li
+	} else {
+		a.unshift(rURL)
 	}
-	a.unshift(rURL)
 
 	return nil
 }
