@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -11,6 +12,15 @@ import (
 )
 
 func main() {
+	var url string
+	if len(os.Args) == 2 {
+		url = os.Args[1]
+	} else if len(os.Args) > 2 {
+		log.Fatal("Too many arguments, please only pass a single url")
+	} else {
+		url = "https://google.com"
+	}
+
 	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
 		log.Fatal(err)
@@ -21,7 +31,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := client.Crawl(ctx, "https://google.com")
+	result, err := client.Crawl(ctx, url)
 	if err != nil {
 		log.Fatal(err)
 	}

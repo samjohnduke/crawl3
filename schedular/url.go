@@ -66,6 +66,10 @@ func (u *URL) ResolveReference(root *url.URL) error {
 	return nil
 }
 
+func (u *URL) Normalised() string {
+	return u.normalised
+}
+
 type urlList struct {
 	list []*URL
 	mu   *sync.Mutex

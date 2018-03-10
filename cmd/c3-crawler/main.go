@@ -27,11 +27,14 @@ func main() {
 
 	instrument := crawler.NewInstrumentationMem()
 
+	publisher := crawler.NewPublisherNats(nc)
+
 	//create the service
 	service, err := crawler.New(crawler.ServiceOpts{
 		Instrument:  instrument,
 		Logger:      log.New(os.Stdout, "", log.LstdFlags),
-		WorkerCount: 4,
+		WorkerCount: 40,
+		Publisher:   publisher,
 	}, func(opts crawler.WorkerOpts) crawler.WorkerFactoryFunc {
 		return func(pool chan chan *crawler.Crawl) crawler.Worker {
 			return crawler.NewDefaultWorker(pool, opts)
