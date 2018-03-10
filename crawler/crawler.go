@@ -56,13 +56,14 @@ type Service interface {
 // The Publisher is an interface that will push out the result of a crawl to those
 // who want ictx context.Contextt
 type Publisher interface {
-	Publish(ctx context.Context, crawl *Crawl) error
+	Publish(crawl *Crawl) error
 }
 
 // A Listener provides a way for the spider to get updates on its crawls in the system
 // It is the other half of Publisher
 type Listener interface {
 	Listen() chan *Crawl
+	Close() error
 }
 
 // The Client interface is the
@@ -103,6 +104,7 @@ type ServiceOpts struct {
 	Logger      *log.Logger
 	Instrument  Instrument
 	Extractors  extractors
+	Publisher   Publisher
 	WorkerCount int64
 }
 
@@ -139,6 +141,7 @@ func New(opts ServiceOpts, workerFactoryInv WorkerFactoryInvoker) (Service, erro
 		extractors: exes,
 		instrument: ins,
 		results:    output,
+		publisher:  opts.Publisher,
 	}
 
 	if workerFactoryInv == nil {

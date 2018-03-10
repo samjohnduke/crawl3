@@ -15,6 +15,9 @@ type Crawl struct {
 	ExtractTime time.Time
 	EndTime     time.Time
 
+	Title       string
+	Description string
+
 	HarvestedURLs []string
 	HarvestedData interface{}
 	MicroData     interface{}

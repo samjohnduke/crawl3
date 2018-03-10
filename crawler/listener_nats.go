@@ -47,6 +47,12 @@ func (ln *ListenerNats) Listen() chan *Crawl {
 }
 
 // Close the nats connection
-func (ln *ListenerNats) Close() {
+func (ln *ListenerNats) Close() error {
+	err := ln.sub.Unsubscribe()
+	if err != nil {
+		return err
+	}
 
+	close(ln.c)
+	return nil
 }
