@@ -6,7 +6,7 @@ import (
 )
 
 func TestExtractors(t *testing.T) {
-	execs := newDefaultExtractors()
+	execs := NewDefaultExtractors()
 	for _, e := range funcExs {
 		e.Register(execs)
 	}

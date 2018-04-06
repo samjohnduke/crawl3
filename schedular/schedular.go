@@ -6,6 +6,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/samjohnduke/crawl3/shared"
+
 	"github.com/samjohnduke/crawl3/crawler"
 )
 
@@ -26,11 +28,9 @@ type Service interface {
 // listen for crawls, pull out the harvested urls, check for whether or not it is needed
 // to crawl and then if yes intelligently push them to the crawler
 type Schedular struct {
-	visited    map[string]*URL
-	pending    map[string]*urlList
-	later      *TimeMap
+	visited    map[string]*shared.URL
+	pending    map[string]*shared.URLList
 	cb         func(*crawler.Crawl) error
-	frequency  int
 	delay      time.Duration
 	die        chan chan bool
 	instrument crawler.Instrument
@@ -41,12 +41,31 @@ type Schedular struct {
 
 // Opts are used to customise the
 type Opts struct {
-	Instrument           crawler.Instrument
-	Logger               *log.Logger
-	Client               crawler.Client
-	ConcurrencyPerDomain int
-	CrawlDelay           time.Duration
-	AllowedDomains       []string
+	Instrument     crawler.Instrument
+	Logger         *log.Logger
+	Client         crawler.Client
+	CrawlDelay     time.Duration
+	AllowedDomains []string
+}
+
+// A HostSchedular looks after a spefic host and is control of scheduling that hosts
+// urls. This enables us to not just crawl but do via other means, such as
+type HostSchedular interface {
+	Start(Service, Store) error
+	Stop(context.Context) error
+	Schedule(*crawler.Crawl)
+}
+
+// NewHostSchedular builds the host schedular from the provided options,
+// and using the opts.Type field, create the schedular of the correct type
+func NewHostSchedular(opts shared.HostSchedularOpts) HostSchedular {
+	switch opts.Type {
+	case shared.RSS:
+		return NewRSSSchedular(NewRSSSchedularOpts(opts))
+	case shared.Sitemap:
+		return NewSitemapSchedular(NewSitemapSchedularOpts(opts))
+	}
+	return nil
 }
 
 // NewSchedular created the new schedular from a set of options
@@ -57,10 +76,7 @@ func NewSchedular(opts Opts) (Service, error) {
 	}
 
 	return &Schedular{
-		visited:    make(map[string]*URL),
-		pending:    make(map[string]*urlList),
-		later:      &TimeMap{},
-		frequency:  opts.ConcurrencyPerDomain,
+		visited:    make(map[string]*shared.URL),
 		logger:     opts.Logger,
 		instrument: opts.Instrument,
 		client:     opts.Client,
@@ -106,11 +122,9 @@ func (s *Schedular) Stop(ctx context.Context) error {
 
 func (s *Schedular) run() {
 
-	toCrawl := []*URL{}
+	toCrawl := []*shared.URL{}
 	for _, list := range s.pending {
-		if list.Len() >= s.frequency {
-			toCrawl = append(toCrawl, list.pop(s.frequency)...)
-		} else if list.Len() > 0 {
+		if list.Len() > 0 {
 			toCrawl = append(toCrawl, list.pop(1)...)
 		}
 	}
@@ -136,10 +150,12 @@ func (s *Schedular) crawl(u *URL) {
 	if err != nil {
 		s.instrument.Count("scheduled_crawl_error")
 		log.Println(err)
+		return
 	}
 
-	if crawl.Error != nil {
+	if crawl.Error != "" {
 		log.Println(crawl.Error)
+		return
 	}
 
 	s.visited[u.normalised] = u
@@ -152,12 +168,12 @@ func (s *Schedular) crawl(u *URL) {
 	}
 
 	for _, hu := range crawl.HarvestedURLs {
-		url, err := NewURLWithReference(hu, crawl.URL)
+		url, err := shared.NewURLWithReference(hu, crawl.URL)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		s.Schedule(url.normalised)
+		s.Schedule(url.Normalised)
 	}
 }
 
@@ -168,12 +184,12 @@ func (s *Schedular) ScheduleAfter(t time.Time, rootURL string) error {
 
 // Schedule pushes just a single url into the application
 func (s *Schedular) Schedule(root string) error {
-	rURL, err := NewURL(root)
+	rURL, err := shared.NewURL(root)
 	if err != nil {
 		return err
 	}
 
-	rHost := rURL.url.Hostname()
+	rHost := rURL.URL.Hostname()
 
 	s.instrument.Count("schedular_one")
 	s.instrument.Histogram("schedular_one_host", rHost)

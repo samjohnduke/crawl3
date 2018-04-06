@@ -1,8 +1,7 @@
-package schedular
+package shared
 
 import (
 	"net/url"
-	"sync"
 
 	"github.com/PuerkitoBio/purell"
 )
@@ -68,53 +67,4 @@ func (u *URL) ResolveReference(root *url.URL) error {
 
 func (u *URL) Normalised() string {
 	return u.normalised
-}
-
-type urlList struct {
-	list []*URL
-	mu   *sync.Mutex
-}
-
-func newURLList() *urlList {
-	return &urlList{
-		list: []*URL{},
-		mu:   &sync.Mutex{},
-	}
-}
-
-func (ul *urlList) Len() int {
-	return len(ul.list)
-}
-
-func (ul *urlList) push(newURL *URL) {
-	ul.mu.Lock()
-	defer ul.mu.Unlock()
-
-	ul.list = append(ul.list, newURL)
-}
-
-func (ul *urlList) pop(c int) []*URL {
-	ul.mu.Lock()
-	defer ul.mu.Unlock()
-
-	p := ul.list[len(ul.list)-c:]
-	ul.list = ul.list[:len(ul.list)-c]
-	return p
-}
-
-func (ul *urlList) shift(c int) []*URL {
-	ul.mu.Lock()
-	defer ul.mu.Unlock()
-
-	p := ul.list[0:c]
-	ul.list = ul.list[c:]
-
-	return p
-}
-
-func (ul *urlList) unshift(newURL *URL) {
-	ul.mu.Lock()
-	defer ul.mu.Unlock()
-
-	ul.list = append([]*URL{newURL}, ul.list...)
 }

@@ -3,7 +3,7 @@ package crawler
 // The Extractors is an object that builds a list of possible extractors.
 // the implementation will perform optimization based what the extractor's
 // listen for (thoughts for the future)
-type extractors interface {
+type Extractors interface {
 	Add(extractor)
 	Matches(url string) []extractor
 }
@@ -13,12 +13,14 @@ type defaultExtractors struct {
 	list map[string][]extractor
 }
 
-func newDefaultExtractors() extractors {
+// NewDefaultExtractors builds a minimal interface for a list of extractors
+func NewDefaultExtractors() Extractors {
 	return &defaultExtractors{
 		list: make(map[string][]extractor),
 	}
 }
 
+// Add an extractor to the list
 func (e *defaultExtractors) Add(ex extractor) {
 	url := ex.Match()
 	list := e.list[url]
@@ -32,6 +34,7 @@ func (e *defaultExtractors) Add(ex extractor) {
 	}
 }
 
+// Matches gets a list of extractors that match a given url
 func (e *defaultExtractors) Matches(url string) []extractor {
 	return e.list[url]
 }

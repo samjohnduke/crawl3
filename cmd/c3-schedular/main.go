@@ -22,12 +22,11 @@ func main() {
 	client := crawler.NewClientNats(nc)
 
 	opts := schedular.Opts{
-		Client:               client,
-		ConcurrencyPerDomain: 2,
-		CrawlDelay:           1 * time.Second,
-		Instrument:           crawler.NewInstrumentationMem(),
-		Logger:               log.New(os.Stdout, log.Prefix(), log.LstdFlags),
-		AllowedDomains:       []string{"www.paulgraham.com"},
+		Client:         client,
+		CrawlDelay:     1 * time.Second,
+		Instrument:     crawler.NewInstrumentationMem(),
+		Logger:         log.New(os.Stdout, log.Prefix(), log.LstdFlags),
+		AllowedDomains: []string{"www.paulgraham.com"},
 	}
 
 	sched, err := schedular.NewSchedular(opts)

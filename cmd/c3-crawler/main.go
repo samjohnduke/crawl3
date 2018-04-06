@@ -29,12 +29,18 @@ func main() {
 
 	publisher := crawler.NewPublisherNats(nc)
 
+	execs := crawler.NewDefaultExtractors()
+	for _, e := range funcExs {
+		e.Register(execs)
+	}
+
 	//create the service
 	service, err := crawler.New(crawler.ServiceOpts{
 		Instrument:  instrument,
 		Logger:      log.New(os.Stdout, "", log.LstdFlags),
 		WorkerCount: 40,
 		Publisher:   publisher,
+		Extractors:  execs,
 	}, func(opts crawler.WorkerOpts) crawler.WorkerFactoryFunc {
 		return func(pool chan chan *crawler.Crawl) crawler.Worker {
 			return crawler.NewDefaultWorker(pool, opts)

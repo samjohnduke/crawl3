@@ -9,7 +9,7 @@ import (
 func TestWorker(t *testing.T) {
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	ins := NewInstrumentationMem()
-	exes := newDefaultExtractors()
+	exes := NewDefaultExtractors()
 
 	opts := WorkerOpts{
 		logger:     logger,
@@ -33,7 +33,7 @@ func TestWorker(t *testing.T) {
 func TestInvalidURLWorker(t *testing.T) {
 	logger := log.New(os.Stdout, "", log.LstdFlags)
 	ins := NewInstrumentationMem()
-	exes := newDefaultExtractors()
+	exes := NewDefaultExtractors()
 
 	opts := WorkerOpts{
 		logger:     logger,

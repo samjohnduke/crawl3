@@ -2,6 +2,8 @@ package crawler
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io/ioutil"
@@ -29,11 +31,16 @@ type defaultWorker struct {
 	results    chan *Crawl
 	instrument Instrument
 	logger     *log.Logger
-	extractors extractors
+	extractors Extractors
 	publisher  Publisher
 }
 
+// WorkerFactoryFunc is a function that takes a chan chan crawl and returns a worker
+// that can be instantitated to generate workers on demand
 type WorkerFactoryFunc func(chan chan *Crawl) Worker
+
+// WorkerFactoryInvoker will return the worker factory func configured to use the
+// provided opts
 type WorkerFactoryInvoker func(WorkerOpts) WorkerFactoryFunc
 
 // WorkerOpts are the outside components that are required by the worker
@@ -41,7 +48,7 @@ type WorkerFactoryInvoker func(WorkerOpts) WorkerFactoryFunc
 type WorkerOpts struct {
 	logger     *log.Logger
 	instrument Instrument
-	extractors extractors
+	extractors Extractors
 	publisher  Publisher
 	results    chan *Crawl
 }
@@ -104,17 +111,28 @@ func (w *defaultWorker) do(u *Crawl) error {
 	if err != nil {
 		w.logger.Println(err)
 		w.instrument.Gauge("workers_active", -1)
-		u.Error = err
+		u.Error = err.Error()
 		return err
 	}
 
-	resp, err := http.Get(u.URL)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", u.URL, nil)
 	if err != nil {
 		w.logger.Println(err)
 		w.instrument.Gauge("workers_active", -1)
-		u.Error = err
+		u.Error = err.Error()
 		return err
 	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:58.0) Gecko/20100101 Firefox/58.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		w.logger.Println(err)
+		w.instrument.Gauge("workers_active", -1)
+		u.Error = err.Error()
+		return err
+	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
@@ -126,17 +144,20 @@ func (w *defaultWorker) do(u *Crawl) error {
 	if err != nil {
 		w.logger.Println(err)
 		w.instrument.Gauge("workers_active", -1)
-		u.Error = err
+		u.Error = err.Error()
 		return err
 	}
 
 	u.FetchTime = time.Now()
 
+	s := sha256.Sum256(body)
+	sum := hex.EncodeToString(s[:])
+
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
 	if err != nil {
 		w.logger.Println(err)
 		w.instrument.Gauge("workers_active", -1)
-		u.Error = err
+		u.Error = err.Error()
 		return err
 	}
 
@@ -161,7 +182,7 @@ func (w *defaultWorker) do(u *Crawl) error {
 
 	normalisedUrls := w.normaliseUrls(urls, u.URL)
 
-	metadata := make(map[string]string)
+	metadata := make(map[string]interface{})
 	doc.Find("meta[name]").Each(func(_ int, sel *goquery.Selection) {
 		var name string
 		var value string
@@ -175,7 +196,17 @@ func (w *defaultWorker) do(u *Crawl) error {
 		}
 
 		if name != "" && value != "" {
-			metadata[name] = value
+			if name == "article:tag" {
+				tagsIn, ok := metadata[name]
+				if !ok {
+					metadata[name] = []string{value}
+				} else {
+					tags := tagsIn.([]string)
+					metadata[name] = append(tags, value)
+				}
+			} else {
+				metadata[name] = value
+			}
 		}
 	})
 	doc.Find("meta[property]").Each(func(_ int, sel *goquery.Selection) {
@@ -187,11 +218,22 @@ func (w *defaultWorker) do(u *Crawl) error {
 		}
 
 		if attr, ok := sel.Attr("content"); ok {
-			value = attr
+			value = strings.TrimSpace(attr)
 		}
 
 		if name != "" && value != "" {
-			metadata[name] = value
+			if name == "article:tag" {
+				tagsIn, ok := metadata[name]
+				if !ok {
+					metadata[name] = []string{strings.TrimSpace(value)}
+				} else {
+					tags := tagsIn.([]string)
+					metadata[name] = append(tags, strings.TrimSpace(value))
+				}
+
+			} else {
+				metadata[name] = value
+			}
 		}
 	})
 
@@ -210,7 +252,7 @@ func (w *defaultWorker) do(u *Crawl) error {
 	mdata, err := ps.Parse()
 	if err != nil {
 		w.logger.Println(err)
-		u.Error = err
+		u.Error = err.Error()
 	}
 
 	var harvested []interface{}
@@ -222,10 +264,13 @@ func (w *defaultWorker) do(u *Crawl) error {
 			continue
 		}
 
-		harvested = append(harvested, h)
+		if h != nil {
+			harvested = append(harvested, h)
+		}
 	}
 
 	u.ExtractTime = time.Now()
+	u.PageHash = sum
 
 	u.Title = title
 	u.Description = description

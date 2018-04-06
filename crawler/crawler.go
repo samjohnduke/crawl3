@@ -103,7 +103,7 @@ type crawler struct {
 type ServiceOpts struct {
 	Logger      *log.Logger
 	Instrument  Instrument
-	Extractors  extractors
+	Extractors  Extractors
 	Publisher   Publisher
 	WorkerCount int64
 }
@@ -115,7 +115,7 @@ func New(opts ServiceOpts, workerFactoryInv WorkerFactoryInvoker) (Service, erro
 
 	var ins Instrument
 	var logger *log.Logger
-	var exes extractors
+	var exes Extractors
 	var factory WorkerFactoryFunc
 
 	if opts.Instrument == nil {
@@ -131,7 +131,7 @@ func New(opts ServiceOpts, workerFactoryInv WorkerFactoryInvoker) (Service, erro
 	}
 
 	if opts.Extractors == nil {
-		exes = newDefaultExtractors()
+		exes = NewDefaultExtractors()
 	} else {
 		exes = opts.Extractors
 	}

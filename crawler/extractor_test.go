@@ -59,8 +59,8 @@ func TestABCExtractor(t *testing.T) {
 	}
 }
 
-var funcExs = []*funcExtractor{
-	&funcExtractor{"www.domain.com.au", func(doc *goquery.Document) (interface{}, error) {
+var funcExs = []*FuncExtractor{
+	&FuncExtractor{"www.domain.com.au", func(doc *goquery.Document) (interface{}, error) {
 
 		result := doc.Find(".listing-details__root").Length()
 		if result == 0 {
@@ -77,7 +77,7 @@ var funcExs = []*funcExtractor{
 
 		return data, nil
 	}},
-	&funcExtractor{"www.abc.net.au", func(doc *goquery.Document) (interface{}, error) {
+	&FuncExtractor{"www.abc.net.au", func(doc *goquery.Document) (interface{}, error) {
 		result := doc.Find(".news.story_page").Length()
 		if result == 0 {
 			return nil, nil
