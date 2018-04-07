@@ -65,6 +65,12 @@ func (u *URL) ResolveReference(root *url.URL) error {
 	return nil
 }
 
+// Normalised returns the normalised string url for the underlying url.URL
 func (u *URL) Normalised() string {
 	return u.normalised
+}
+
+// Hostname returns the host name of the url
+func (u *URL) Hostname() string {
+	return u.url.Hostname()
 }

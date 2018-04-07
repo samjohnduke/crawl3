@@ -77,6 +77,7 @@ func NewSchedular(opts Opts) (Service, error) {
 
 	return &Schedular{
 		visited:    make(map[string]*shared.URL),
+		pending:    make(map[string]*shared.URLList),
 		logger:     opts.Logger,
 		instrument: opts.Instrument,
 		client:     opts.Client,
@@ -125,28 +126,28 @@ func (s *Schedular) run() {
 	toCrawl := []*shared.URL{}
 	for _, list := range s.pending {
 		if list.Len() > 0 {
-			toCrawl = append(toCrawl, list.pop(1)...)
+			toCrawl = append(toCrawl, list.Pop(1)...)
 		}
 	}
 
 	for _, u := range toCrawl {
-		if _, exists := s.visited[u.normalised]; exists {
+		if _, exists := s.visited[u.Normalised()]; exists {
 			continue
 		}
 
-		rHost := u.url.Hostname()
+		rHost := u.Hostname()
 		if _, exists := s.allowed[rHost]; exists {
 			go s.crawl(u)
 		}
 	}
 }
 
-func (s *Schedular) crawl(u *URL) {
+func (s *Schedular) crawl(u *shared.URL) {
 	s.instrument.Gauge("scheduled_crawl_progress", 1)
 	defer s.instrument.Gauge("scheduled_crawl_progress", -1)
 
-	log.Println("starting crawl of: ", u.normalised)
-	crawl, err := s.client.Crawl(context.Background(), u.normalised)
+	log.Println("starting crawl of: ", u.Normalised())
+	crawl, err := s.client.Crawl(context.Background(), u.Normalised())
 	if err != nil {
 		s.instrument.Count("scheduled_crawl_error")
 		log.Println(err)
@@ -158,7 +159,7 @@ func (s *Schedular) crawl(u *URL) {
 		return
 	}
 
-	s.visited[u.normalised] = u
+	s.visited[u.Normalised()] = u
 
 	if s.cb != nil {
 		err := s.cb(crawl)
@@ -173,7 +174,7 @@ func (s *Schedular) crawl(u *URL) {
 			log.Println(err)
 			continue
 		}
-		s.Schedule(url.Normalised)
+		s.Schedule(url.Normalised())
 	}
 }
 
@@ -189,18 +190,18 @@ func (s *Schedular) Schedule(root string) error {
 		return err
 	}
 
-	rHost := rURL.URL.Hostname()
+	rHost := rURL.Hostname()
 
 	s.instrument.Count("schedular_one")
 	s.instrument.Histogram("schedular_one_host", rHost)
 
 	a, exists := s.pending[rHost]
 	if !exists {
-		li := newURLList()
-		li.unshift(rURL)
+		li := shared.NewURLList()
+		li.Unshift(rURL)
 		s.pending[rHost] = li
 	} else {
-		a.unshift(rURL)
+		a.Unshift(rURL)
 	}
 
 	return nil
