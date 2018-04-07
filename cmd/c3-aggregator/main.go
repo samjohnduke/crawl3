@@ -15,6 +15,8 @@ import (
 	nats "github.com/nats-io/go-nats"
 )
 
+var startMsg = "Starting Aggregator"
+
 func main() {
 	log.Println("Starting Aggregator")
 
@@ -33,7 +35,7 @@ func main() {
 	}
 	aql, err := driver.NewClient(driver.ClientConfig{
 		Connection:     conn,
-		Authentication: driver.BasicAuthentication("sam", "sammax1PaHd91U6"),
+		Authentication: driver.BasicAuthentication("sam", "none"),
 	})
 	if err != nil {
 		log.Fatal(err)

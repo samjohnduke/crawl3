@@ -18,7 +18,7 @@ func main() {
 	} else if len(os.Args) > 2 {
 		log.Fatal("Too many arguments, please only pass a single url")
 	} else {
-		url = "https://google.com"
+		log.Fatal("missing url argument")
 	}
 
 	nc, err := nats.Connect(nats.DefaultURL)

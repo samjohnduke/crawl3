@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -9,10 +10,20 @@ import (
 
 	"github.com/nats-io/go-nats"
 	"github.com/samjohnduke/crawl3/crawler"
+	"github.com/samjohnduke/crawl3/shared"
 )
 
+var setupMsg = "Setting up Crawler"
+var stopMsg = "Stopping Crawler"
+var workerCount int
+var hostDir string
+
 func main() {
-	log.Println("Setting up Crawler")
+	log.Println(setupMsg)
+
+	flag.StringVar(&hostDir, "hostDir", "../models", "The directory that stores the models")
+	flag.IntVar(&workerCount, "wc", 40, "The number of workers to spin up")
+	flag.Parse()
 
 	//Setup the system to wait for shutdown
 	sigs := make(chan os.Signal, 1)
@@ -26,19 +37,26 @@ func main() {
 	}
 
 	instrument := crawler.NewInstrumentationMem()
-
 	publisher := crawler.NewPublisherNats(nc)
-
+	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lshortfile)
 	execs := crawler.NewDefaultExtractors()
-	for _, e := range funcExs {
-		e.Register(execs)
+
+	// load models for extracting data
+	hosts, err := shared.LoadHostsFromDir(hostDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, host := range hosts {
+		e := &crawler.JSONExtractor{Rules: host.Extractor}
+		execs.Add(e)
 	}
 
 	//create the service
 	service, err := crawler.New(crawler.ServiceOpts{
 		Instrument:  instrument,
-		Logger:      log.New(os.Stdout, "", log.LstdFlags),
-		WorkerCount: 40,
+		Logger:      logger,
+		WorkerCount: int64(workerCount),
 		Publisher:   publisher,
 		Extractors:  execs,
 	}, func(opts crawler.WorkerOpts) crawler.WorkerFactoryFunc {
@@ -58,12 +76,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("crawler started")
-
 	// Wait for shutdown and then turn off the transport
 	go func() {
 		<-sigs
-		log.Println("Shutting Down Crawler")
+		log.Println(stopMsg)
 
 		err = transport.Stop(context.Background())
 		if err != nil {
